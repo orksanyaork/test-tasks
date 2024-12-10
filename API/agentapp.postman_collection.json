@@ -1,0 +1,751 @@
+{
+	"info": {
+		"_postman_id": "76dce1f1-f334-41a8-9dbb-ad69a62c028f",
+		"name": "agentapp",
+		"description": "Задание: составить и выслать Postman коллекцию (файл JSON) на основе описанной документации. Часть примеров запросов была умышленно скрыта, чтобы ты мог составить запрос самостоятельно по аналогии с прошлыми примерами.\n\n**Цель:**  \nС помощью полученной коллекции дойти до этапа “Расчет полиса” в страховой компании и получить ответ.\n\n**Примечание**  \nДанные можно использовать свои или тестовые.\n\nHost: [<code>https://partner.agentapp.ru/</code>](https://partner.agentapp.ru/)  \nLogin: [<code>qa@qa.qa</code>](https://mailto:qa@qa.qa)  \nPassword: `111`  \napi_version: `v1`\n\n**МЕТОДЫ ЗАПРОСОВ.**  \n● `GET` - получить объект/объекты. Если не указывать ID объекта, то получаем все доступные объекты. Пример, `/dicts/credential_types`  \n● `POST` - создать объект.  \n● `PUT` - обновить полностью объект. Требуется ID объекта  \n● `PATCH` - обновить частично объект. Требуется ID объекта  \n● `DELETE` - удалить объект. Требуется ID объекта\n\n**АУТЕНТИФИКАЦИЯ**  \n● Все запросы, кроме получения токена требуют передачу вместе с запросом заголовка:  \n`Authorization: Token {{token}}`,  \nгде `{{token}}` - это токен  \n● Получение токена осуществляется через метод `/users/obtain-token`\n\n**ТИП ПЕРЕДАВАЕМОЙ И ПОЛУЧАЕМОЙ ИНФОРМАЦИИ (ACCEPT, CONTENT-TYPE)**  \n● Каждый запрос, как ожидает, так и отвечает `application/json`\n\nTODO:\n\n- сделать проверки на формат отправляемых/получаемых параметров (через регулярки)\n    \n- дополнить документацию\n    \n\nБАГИ:\n\n- после создания договора (`POST`) необходимо обновить его (`PATCH`) для получения полного расчета по СК.  \n    _Только после обновления договора в ответе сервера выдается верный_ `\"insured_object\"` _(вместо_ `null`_)_\n    \n- при использовании `api` `v2, v3`, если сервер отвечает в формате `json`, но в ответе нет параметра `id`, то `postman` правильно выполнит тест на проверку наличия такого параметра в ответе, но с чистой совестью сохранит его значение (пустое) в заданную переменную  \n    **РЕШЕНО**: написал проверку, что значение у `id` определенно",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25057559"
+	},
+	"item": [
+		{
+			"name": "Получение токена",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'token' is received\", function () {\r",
+							"    pm.expect(pm.response.json()).to.be.an('object').that.has.property('token');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Save 'token' to environment variable\", function () {\r",
+							"    pm.collectionVariables.set(\"token\", pm.response.json().token);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"pm.test(\"Pre-Request: body contains username and password\", function () {\r",
+							"    pm.expect(JSON.parse(pm.request.body.raw)).to.be.an('object').that.includes.keys('username', 'password');\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\": \"qa@qa.qa\",\r\n    \"password\": \"111\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{http_schema}}://{{host}}/{{api_version}}/users/obtain-token",
+					"protocol": "{{http_schema}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{api_version}}",
+						"users",
+						"obtain-token"
+					]
+				},
+				"description": "Сервис работает только с аутентифицированным пользователем.  \nАутентификация работает через заголовок  \n\"`Authorization: Token {{token}}`\",  \nгде `{{token}}` - токен, полученный от системы в ответ на данный `/account/obtain-token` запрос - `POST`\\-запрос с инфой:  \n● `\"username\"` -- логин пользователя  \n● `\"password\"` -- пароль  \nВ ответе получаем `\"token\"`"
+			},
+			"response": []
+		},
+		{
+			"name": "Создание водителя",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"pm.test(\"Pre-Request: body contains the necessary properties\", function () {\r",
+							"    pm.expect(JSON.parse(pm.request.body.raw)).to.be.an('object').that.includes.keys('first_name', 'last_name', 'patronymic', 'birth_date', 'driving_experience_started', 'driver_licenses');\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {\r",
+							"    pm.response.to.have.status(201);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'kbm_value' is received\", function () {\r",
+							"    pm.expect(pm.response.json()).to.be.an('object').that.has.property('kbm_value');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'is_rsa_checked' is received\", function () {\r",
+							"    pm.expect(pm.response.json()).to.be.an('object').that.has.property('is_rsa_checked');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'id' is received\", function () {\r",
+							"    pm.expect(pm.response.json()).to.be.an('object').that.has.property('id');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Save 'id' to environment variable 'id_driver'\", function () {\r",
+							"    pm.expect(pm.response.json().id !== null && pm.response.json().id !== undefined).to.be.true;\r",
+							"    pm.collectionVariables.set(\"id_driver\", pm.response.json().id);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"first_name\": \"Иван\",\r\n  \"last_name\": \"Иванов\",\r\n  \"patronymic\": \"Иванович\",\r\n  \"birth_date\": \"1990-01-01\",\r\n  \"driving_experience_started\": \"2010-10-10\",\r\n  \"driver_licenses\": [\r\n    {\r\n      \"credential_type\": \"DRIVER_LICENSE\",\r\n      \"number\": \"012345\",\r\n      \"series\": \"1234\",\r\n      \"issue_date\": \"2010-10-10\"\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{http_schema}}://{{host}}/{{api_version}}/insured_objects/drivers",
+					"protocol": "{{http_schema}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{api_version}}",
+						"insured_objects",
+						"drivers"
+					]
+				},
+				"description": "В ответе находятся параметры по КБМ:  \n`\"kbm_value\"` -- коэф. КБМ  \n`\"is_rsa_checked\"` -- true/false (ответ из РСА о наличии водителя в базе РСА)\n\nНа каждого водителя требуется отдельный запрос.  \nИз ответа берём `\"id\"` -- потребуется при создании сущности \"объект страхования\""
+			},
+			"response": []
+		},
+		{
+			"name": "Создание собственника",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"pm.test(\"Pre-Request: body contains the necessary properties\", function () {\r",
+							"    pm.expect(JSON.parse(pm.request.body.raw)).to.be.an('object').that.includes.keys('first_name', 'last_name', 'patronymic', 'gender', 'birth_date', 'credential', 'address');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Pre-Request: 'address' contains the 'LEGAL_ADDRESS'\", function () {\r",
+							"     pm.expect(JSON.parse(pm.request.body.raw).address.some(address => address.address_type === 'LEGAL_ADDRESS')).to.be.true;\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {\r",
+							"    pm.response.to.have.status(201);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'person' is received\", function () {\r",
+							"    pm.expect(pm.response.json()).to.be.an('object').that.has.property('person');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Save 'person' to environment variable 'id_owner'\", function () {\r",
+							"    pm.expect(pm.response.json().person !== null && pm.response.json().person !== undefined).to.be.true;\r",
+							"    pm.collectionVariables.set(\"id_owner\", pm.response.json().person);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"last_name\": \"Иванов\",\r\n  \"first_name\": \"Иван\",\r\n  \"patronymic\": \"Иванович\",\r\n  \"gender\": \"M\",\r\n  \"birth_date\": \"1990-01-01\",\r\n  \"credential\": [\r\n    {\r\n      \"credential_type\": \"RUSSIAN_INTERNAL_PASSPORT\",\r\n      \"issue_date\": \"2017-03-08\",\r\n      \"issue_point\": \"УФМС\",\r\n      \"issue_point_code\": \"123-456\",\r\n      \"number\": \"123456\",\r\n      \"series\": \"1234\"\r\n    }\r\n  ],\r\n  \"address\": [\r\n    {\r\n      \"address_query\": \"г Санкт-Петербург, г Ломоносов, ул Швейцарская, д 1 к 1, кв 1\",\r\n      \"address_type\": \"LEGAL_ADDRESS\",\r\n      \"region_kladr_id\": \"7800000000000\",\r\n      \"city_kladr_id\": \"7800000600000\"\r\n    },\r\n    {\r\n      \"address_query\": \"г Санкт-Петербург, г Ломоносов, ул Швейцарская, д 1 к 1, кв 1\",\r\n      \"address_type\": \"ACTUAL_ADDRESS\",\r\n      \"region_kladr_id\": \"7800000000000\",\r\n      \"city_kladr_id\": \"7800000600000\"\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{http_schema}}://{{host}}/{{api_version}}/insured_objects/owners/natural_persons",
+					"protocol": "{{http_schema}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{api_version}}",
+						"insured_objects",
+						"owners",
+						"natural_persons"
+					]
+				},
+				"description": "Создание собственника ФЛ требует следующих полей:  \n● `\"last_name\"` -- Фамилия  \n● `\"first_name\"` -- Имя  \n● `\"patronymic\"` -- Отчётство  \n● `\"gender\"` -- Пол (`M`, `F`)  \n● `\"birth_date\"` -- дата рождения в формате `\"1987-01-13\"`  \n● `\"credential\"` -- документы. Массив. Первым элементом необходимо добавить российский паспорт  \n● `\"address\"` -- адреса. Массив. Два типа адресов - фактический и юридический. Различаются по параметру `\"address_type\"`: `\"ACTUAL_ADDRESS\"` и `\"LEGAL_ADDRESS\"` соответственно.\n\nУказание `LEGAL_ADDRESS` необходимо для получения расчетов страховых компаний.  \nДля создания страхового объекта брать `ID` из поля `Person`"
+			},
+			"response": []
+		},
+		{
+			"name": "Создание страхователя",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"pm.test(\"Pre-Request: body contains the necessary properties\", function () {\r",
+							"    pm.expect(JSON.parse(pm.request.body.raw)).to.be.an('object').that.includes.keys('first_name', 'last_name', 'patronymic', 'gender', 'birth_date', 'credential', 'address');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Pre-Request: 'address' contains the 'LEGAL_ADDRESS'\", function () {\r",
+							"     pm.expect(JSON.parse(pm.request.body.raw).address.some(address => address.address_type === 'LEGAL_ADDRESS')).to.be.true;\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {\r",
+							"    pm.response.to.have.status(201);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'person' is received\", function () {\r",
+							"    pm.expect(pm.response.json()).to.be.an('object').that.has.property('person');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Save 'person' to environment variable 'id_insurant'\", function () {\r",
+							"    pm.expect(pm.response.json().person !== null && pm.response.json().person !== undefined).to.be.true;\r",
+							"    pm.collectionVariables.set(\"id_insurant\", pm.response.json().person);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"last_name\": \"Петрова\",\r\n  \"first_name\": \"Анна\",\r\n  \"patronymic\": \"Петровна\",\r\n  \"gender\": \"F\",\r\n  \"birth_date\": \"1980-02-02\",\r\n  \"credential\": [\r\n    {\r\n      \"credential_type\": \"RUSSIAN_INTERNAL_PASSPORT\",\r\n      \"issue_date\": \"2018-04-09\",\r\n      \"issue_point\": \"УФМС\",\r\n      \"issue_point_code\": \"789-012\",\r\n      \"number\": \"345678\",\r\n      \"series\": \"9012\"\r\n    }\r\n  ],\r\n  \"address\": [\r\n    {\r\n      \"address_query\": \"г Ломоносов, ул Швейцарская, д 2 к 2, кв 2\",\r\n      \"address_type\": \"LEGAL_ADDRESS\",\r\n      \"region_kladr_id\": \"7800000000000\",\r\n      \"city_kladr_id\": \"7800000600000\"\r\n    },\r\n    {\r\n      \"address_query\": \"г Ломоносов, ул Швейцарская, д 2 к 2, кв 2\",\r\n      \"address_type\": \"ACTUAL_ADDRESS\",\r\n      \"region_kladr_id\": \"7800000000000\",\r\n      \"city_kladr_id\": \"7800000600000\"\r\n    }\r\n  ],\r\n  \"contact\": [\r\n    {\r\n        \"contact_type\": \"PHONE\",\r\n        \"data\": \"+7 (909) 444-33-22\"\r\n    },\r\n    {\r\n        \"contact_type\": \"EMAIL\",\r\n        \"data\": \"test@mail.ru\"\r\n    }\r\n]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{http_schema}}://{{host}}/{{api_version}}/insured_objects/insurants/natural_persons",
+					"protocol": "{{http_schema}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{api_version}}",
+						"insured_objects",
+						"insurants",
+						"natural_persons"
+					]
+				},
+				"description": "Аналогично созданию собственника (физлицо)  \nДля создания страхового объекта брать `ID` из поля `Person`"
+			},
+			"response": []
+		},
+		{
+			"name": "Создание автомобиля",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"pm.test(\"Pre-Request: body contains the necessary properties\", function () {\r",
+							"    pm.expect(JSON.parse(pm.request.body.raw)).to.be.an('object').that.includes.keys('car_model_id', 'engine_power', 'manufacturing_year', 'max_mass', 'credential');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Pre-Request: body should have at least one of 'chassis_number', 'car_body_number', 'vin_number', 'number_plate'\", function () {\r",
+							"     const body = JSON.parse(pm.request.body.raw);\r",
+							"\r",
+							"    // Проверяем наличие хотя бы одного из параметров\r",
+							"    const hasChassisNumber = body.chassis_number !== null && body.chassis_number !== undefined;\r",
+							"    const hasCarBodyNumber = body.car_body_number !== null && body.car_body_number !== undefined;\r",
+							"    const hasVinNumber = body.vin_number !== null && body.vin_number !== undefined;\r",
+							"    const hasNumberPlate = body.number_plate !== null && body.number_plate !== undefined;\r",
+							"\r",
+							"    const hasAtLeastOneParameter = hasChassisNumber || hasCarBodyNumber || hasVinNumber || hasNumberPlate;\r",
+							"\r",
+							"    pm.expect(hasAtLeastOneParameter).to.be.true;\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {\r",
+							"    pm.response.to.have.status(201);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'id' is received\", function () {\r",
+							"    pm.expect(pm.response.json()).to.be.an('object').that.has.property('id');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Save 'id' to environment variable 'id_car'\", function () {\r",
+							"    pm.expect(pm.response.json().id !== null && pm.response.json().id !== undefined).to.be.true;\r",
+							"    pm.collectionVariables.set(\"id_car\", pm.response.json().id);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"car_model_id\": 864026180,\r\n  \"engine_power\": 211,\r\n  \"chassis_number\": null,\r\n  \"car_body_number\": null,\r\n  \"vin_number\": \"WAUZZZ8T4BA037241\",\r\n  \"number_plate\": \"Р904МХ178\",\r\n  \"manufacturing_year\": 2010,\r\n  \"max_mass\": null,\r\n  \"credential\": [\r\n    {\r\n      \"credential_type\": \"VEHICLE_REGISTRATION\",\r\n      \"issue_date\": \"2010-11-01\",\r\n      \"number\": \"267461\",\r\n      \"series\": \"78УН\"\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{http_schema}}://{{host}}/{{api_version}}/insured_objects/cars",
+					"protocol": "{{http_schema}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{api_version}}",
+						"insured_objects",
+						"cars"
+					]
+				},
+				"description": "Создание автомобиля требует следующих полей:  \n● `\"car_model\"` -- `id` Модели  \n● `\"engine_power\"` -- мощность двигателя в л.с. Уже присутствует, при `PATCH`'е не требуется указывать.  \n● `\"chassis_number\"` -- Номер шасси (не обязательно)  \n● `\"car_body_number\"` -- Номер кузов (прицеп) (не обязательно)  \n● `\"vin_number\"` -- ВИН (не обязательно)  \n● `\"number_plate\"` -- Номерной знак (не обязательно)  \n● `\"manufacturing_year\"` -- год выпуска в формате `\"2010\"`  \n● `\"max_mass\"` -- максимальная масса (для категории Д)  \n● `\"credential\"` -- документ.  \nНеобходимо указать минимум один из четырёх параметров:  \n● `\"vin_number\"` -- ВИН (не обязательно)  \n● `\"number_plate\"` -- Номерной знак (не обязательно)  \nВ ответе придут:  \n● `\"id\"`"
+			},
+			"response": []
+		},
+		{
+			"name": "Создание объекта страхования",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"pm.test(\"Pre-Request: body contains the necessary properties\", function () {\r",
+							"    pm.expect(JSON.parse(pm.request.body.raw)).to.be.an('object').that.includes.keys('drivers', 'owner', 'car', 'insurant');\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {\r",
+							"    pm.response.to.have.status(201);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'id' is received\", function () {\r",
+							"    pm.expect(pm.response.json()).to.be.an('object').that.has.property('id');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Save 'id' to environment variable 'id_insured_object'\", function () {\r",
+							"    pm.expect(pm.response.json().id !== null && pm.response.json().id !== undefined).to.be.true;\r",
+							"    pm.collectionVariables.set(\"id_insured_object\", pm.response.json().id);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"drivers\": [\r\n        \"{{id_driver}}\"\r\n    ],\r\n    \"owner\": \"{{id_owner}}\",\r\n    \"car\": \"{{id_car}}\",\r\n    \"insurant\": \"{{id_insurant}}\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{http_schema}}://{{host}}/{{api_version}}/insured_objects/",
+					"protocol": "{{http_schema}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{api_version}}",
+						"insured_objects",
+						""
+					]
+				},
+				"description": "Объединение субъектов и объектов страхования в одну сущность “объект страхования”\n\nСоздаём техническую сущность - \"объект страхования\".  \n● `\"drivers\"` -- массив водителей  \n● `\"owner\"` -- собственник  \n● `\"car\"` -- автомобиль  \n● `\"insurant\"` -- Страхователь  \n●  \nИз ответа берём `\"id\"` -- потребуется при создании договора"
+			},
+			"response": []
+		},
+		{
+			"name": "Создание договора",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'id' is received\", function () {\r",
+							"    pm.expect(pm.response.json()).to.be.an('object').that.has.property('id');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Save 'id' to environment variable 'agreement_id'\", function () {\r",
+							"    pm.expect(pm.response.json().id !== null && pm.response.json().id !== undefined).to.be.true;\r",
+							"    pm.collectionVariables.set(\"agreement_id\", pm.response.json().id);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"has_car_trailer\": false,\r\n    \"car_type\": \"A\",\r\n    \"drivers_ids\": [\r\n        \"{{id_driver}}\"\r\n    ],\r\n    \"engine_power\": \"\",\r\n    \"insurance_period\": 8,\r\n    \"insured_object\": \"{{id_insured_object}}\",\r\n    \"owner_registration\": {\r\n      \"address_query\": \"г Санкт-Петербург, г Ломоносов, ул Швейцарская, д 1 к 1, кв 1\",\r\n      \"address_type\": \"LEGAL_ADDRESS\",\r\n      \"region_kladr_id\": \"7800000000000\",\r\n      \"city_kladr_id\": \"7800000600000\"\r\n    },\r\n    \"target_of_using\": 11,\r\n    \"valid_from\": \"2024-12-12\",\r\n    \"valid_to\": \"2025-12-11\",\r\n    \"is_car_without_registration\": false,\r\n    \"with_ic_calculation\": false,\r\n    \"periods\": [\r\n        {\r\n            \"start_date\": \"2024-12-12\",\r\n            \"end_date\": \"2025-12-11\"\r\n        }\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{http_schema}}://{{host}}/{{api_version}}/agreements/calculations",
+					"protocol": "{{http_schema}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{api_version}}",
+						"agreements",
+						"calculations"
+					]
+				},
+				"description": "Параметры:  \n● `valid_from` -- начало действия полиса. В системе срок страхования = 1 год, поэтому разница между датой `valid from` и `valid to` должна составлять 1 год. Например, если `valid from` `\"2019-06-30\"`, дата `valid to` должна быть `\"2020-06-29\"`  \n● `valid_to` -- окончание действия полиса  \n● `insurance_period` -- `id` периода (длительность периода страховки) ~~\\= 11~~  \n● `target_of_using` -- цель использования  \n● `drivers_ids` -- массив водителей  \n● `is_car_without_registration` -- ТС без регистрации  \n● `engine_power` -- мощность ТС  \n● `has_car_trailer` -- ТС с прицепом  \n● `car_type` -- тип ТС  \n● `owner_registration` ~~/~~ `~~address_query~~`~~:~~ -- полный адрес регистрации собственника. Формируется аналогично адресу у Собственника. (тип строка см запрос собственник)  \nЕсли был выбран период страхования \"1 год\", то передается пустой массив `periods`. А если был выбран другой период, то в массиве `periods` передаются параметры:  \n● `start_date` -- начало периода  \n● `end_date` -- окончание периода  \nПериод не может выходить за даты начала и окончания договора. Возможные периоды: 3-9 месяцев, 1 год.  \nВ ответе получаем:  \n● `id` -- идентификатор договора. Этот `id` понадобится для дальнейших запросов.  \n● `calculation` -- информация о расчёте  \n● `calculation.premium` -- страховая премия\n\nДополнение:  \n● `with_ic_calculation` -- необязательный параметр\n\nПараметры, подсмотренные на фронтенде:  \n● `\"car_type\": \"A\"`  \n● `\"insurance_period\": 8`  \n● `\"target_of_using\": 11`"
+			},
+			"response": []
+		},
+		{
+			"name": "Обновление договора",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'id' is received\", function () {\r",
+							"    pm.expect(pm.response.json()).to.be.an('object').that.has.property('id');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Save 'id' to environment variable 'agreement_id'\", function () {\r",
+							"    pm.expect(pm.response.json().id !== null && pm.response.json().id !== undefined).to.be.true;\r",
+							"    pm.collectionVariables.set(\"agreement_id\", pm.response.json().id);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"has_car_trailer\": false,\r\n    \"car_type\": \"A\",\r\n    \"drivers_ids\": [\r\n        \"{{id_driver}}\"\r\n    ],\r\n    \"engine_power\": \"\",\r\n    \"insurance_period\": 8,\r\n    \"insured_object\": \"{{id_insured_object}}\",\r\n    \"owner_registration\": {\r\n      \"address_query\": \"г Санкт-Петербург, г Ломоносов, ул Швейцарская, д 1 к 1, кв 1\",\r\n      \"address_type\": \"LEGAL_ADDRESS\",\r\n      \"region_kladr_id\": \"7800000000000\",\r\n      \"city_kladr_id\": \"7800000600000\"\r\n    },\r\n    \"target_of_using\": 11,\r\n    \"valid_from\": \"2024-12-12\",\r\n    \"valid_to\": \"2025-12-11\",\r\n    \"is_car_without_registration\": false,\r\n    \"with_ic_calculation\": false,\r\n    \"periods\": [\r\n        {\r\n            \"start_date\": \"2024-12-12\",\r\n            \"end_date\": \"2025-12-11\"\r\n        }\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{http_schema}}://{{host}}/{{api_version}}/agreements/{{agreement_id}}",
+					"protocol": "{{http_schema}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{api_version}}",
+						"agreements",
+						"{{agreement_id}}"
+					]
+				},
+				"description": "Необходимые параметры:  \n● `\"insured_object\"` -- `id` сущности `InsuredObject`  \nВ ответе получаем:  \n● `id` -- сохраняем как `agreement_id`, дальше будем использовать."
+			},
+			"response": []
+		},
+		{
+			"name": "Получение полного расчёт по СК",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"'integrated_company_title', 'integrated_company_code', 'premium' is received\", function () {\r",
+							"    pm.expect(pm.response.json().parameters).to.be.an('object').that.includes.keys('integrated_company_title', 'integrated_company_code', 'premium');\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"pm.test(\"Pre-Request: ins_company_code contained the real values\", function () {\r",
+							"    const validValues = ['ZETTA', 'ALPHA_STRAH', 'SDS', 'RENAISSANCE', 'RGS', 'SNGI', 'RENAISSANCE', 'INGOSSTRAH', 'TINKOFF'];\r",
+							"    pm.expect(pm.variables.get(\"ins_company_code\")).to.be.oneOf(validValues);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Pre-Request: ins_company_code contained the 'TEST_COMPANY'\", function () {\r",
+							"    const validValues = ['TEST_COMPANY'];\r",
+							"    pm.expect(pm.variables.get(\"ins_company_code\")).to.be.oneOf(validValues);\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{http_schema}}://{{host}}/{{api_version}}/agreements/{{agreement_id}}/results/{{ins_company_code}}",
+					"protocol": "{{http_schema}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{api_version}}",
+						"agreements",
+						"{{agreement_id}}",
+						"results",
+						"{{ins_company_code}}"
+					]
+				},
+				"description": "По каждой страховой компании необходимо отправить данный запрос. В адресной строке параметры:  \n● `\"agreement_id\"` -- `id` Договора в системе AgentApp  \n● `\"ins_company_code\"` -- код Страховой компании. Доступные коды: `ZETTA`, `ALPHA_STRAH`, `SDS`, `RENAISSANCE`, `RGS`, `SNGI`, `UGORIA`, `INGOSSTRAH`, `TINKOFF`  \nВ положительном ответе (статус `200`) получаем параметры:  \n● `\"integrated_company_title\"` -- наименование Страховой Компании  \n● `\"integrated_company_code\"` -- `code` Страховой Компании  \n● `\"premium\"` -- Премия\n\nОжидаемый ответ:\n\n``` json\n{\n    \"parameters\": {\n        \"premium\": \"1.00\",\n        \"segment\": \"Все регионы\",\n        \"commission\": {\n            \"creator_premium\": \"0.00\"\n        },\n        \"is_egarant\": false,\n        \"coefficients\": {\n            \"km\": 1.6,\n            \"kn\": 1.0,\n            \"ko\": 1.0,\n            \"kp\": 1.0,\n            \"ks\": 1.0,\n            \"kt\": 1.0,\n            \"tb\": 5590.0,\n            \"kbm\": 0.74,\n            \"kpr\": 1.0,\n            \"kvs\": 0.93\n        },\n        \"result_parameters\": {\n            \"kbm\": 1.17,\n            \"isReBuy\": 0,\n            \"is_pool\": 0,\n            \"is_test\": true,\n            \"isPulsar\": 0,\n            \"isDiffIns\": 0,\n            \"programs_list\": [],\n            \"isProlongation\": 0,\n            \"is_cross_required\": 0,\n            \"calculation_datetime\": \"2024-12-10T18:06:47.677236+00:00\"\n        },\n        \"integrated_agency_code\": \"TEST_COMPANY_1\",\n        \"integrated_company_code\": \"TEST_COMPANY\",\n        \"is_check_status_allowed\": false,\n        \"integrated_company_title\": \"Тестовая компания\",\n        \"chain_id\": \"fd9a3d32-3877-4deb-bd7a-ab6fbd7f7537\"\n    },\n    \"is_active\": true,\n    \"available_payment_methods\": [\n        \"INTEGRATED_COMPANY\",\n        \"SBERBANK_ONLINE\"\n    ],\n    \"chain_id\": \"fd9a3d32-3877-4deb-bd7a-ab6fbd7f7537\",\n    \"available_payment_partner_shops\": [],\n    \"commission\": {\n        \"creator_premium\": \"0.00\"\n    }\n}\n\n ```"
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "http_schema",
+			"value": "https",
+			"type": "string"
+		},
+		{
+			"key": "host",
+			"value": "partner.agentapp.ru",
+			"type": "string"
+		},
+		{
+			"key": "api_version",
+			"value": "v1",
+			"type": "string"
+		},
+		{
+			"key": "ins_company_code",
+			"value": "TEST_COMPANY",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "id_driver",
+			"value": ""
+		},
+		{
+			"key": "id_owner",
+			"value": ""
+		},
+		{
+			"key": "id_insurant",
+			"value": ""
+		},
+		{
+			"key": "id_car",
+			"value": ""
+		},
+		{
+			"key": "id_insured_object",
+			"value": ""
+		},
+		{
+			"key": "agreement_id",
+			"value": ""
+		}
+	]
+}
